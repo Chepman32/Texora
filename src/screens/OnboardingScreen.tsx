@@ -4,10 +4,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
+  PixelRatio,
   StatusBar,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  useWindowDimensions,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -34,17 +35,16 @@ import PocketDesignerAnimation from '../components/onboarding/PocketDesignerAnim
 import DesignTeamAnimation from '../components/onboarding/DesignTeamAnimation';
 import UniqueDesignAnimation from '../components/onboarding/UniqueDesignAnimation';
 
-const { width } = Dimensions.get('window');
-
 const DotIndicator: React.FC<{ 
   index: number; 
   isActive: boolean; 
   onPress: () => void;
+  pageWidth: number;
   scrollX: any;
-}> = ({ index, isActive, onPress, scrollX }) => {
+}> = ({ index, isActive, onPress, pageWidth, scrollX }) => {
   const dotStyle = useAnimatedStyle(() => {
     const scale = interpolate(
-      scrollX.value / width,
+      scrollX.value / pageWidth,
       [index - 1, index, index + 1],
       [0.8, 1.2, 0.8]
     );
@@ -68,12 +68,20 @@ const DotIndicator: React.FC<{
 };
 
 const OnboardingScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollX = useSharedValue(0);
   const buttonScale = useSharedValue(1);
   const titleOpacity = useSharedValue(1);
   const animationOpacity = useSharedValue(1);
   const { t } = useLanguage();
+  const fontScale = PixelRatio.getFontScale();
+  const isCompactHeight = screenHeight < 780;
+  const isCompactWidth = screenWidth < 380;
+  const titleFontSize = isCompactHeight || isCompactWidth ? 24 : 28;
+  const descriptionFontSize = isCompactHeight ? 15 : 16;
+  const titleLineHeight = Math.ceil(titleFontSize * fontScale * 1.3);
+  const descriptionLineHeight = Math.ceil(descriptionFontSize * fontScale * 1.45);
   
   const flatListRef = useRef<any>(null);
 
@@ -93,9 +101,9 @@ const OnboardingScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       scrollX.value = event.contentOffset.x;
       
       // Update opacity based on scroll
-      const index = Math.round(event.contentOffset.x / width);
-      titleOpacity.value = withTiming(1 - Math.abs((event.contentOffset.x / width) - index) * 0.5);
-      animationOpacity.value = withTiming(1 - Math.abs((event.contentOffset.x / width) - index) * 0.3);
+      const index = Math.round(event.contentOffset.x / screenWidth);
+      titleOpacity.value = withTiming(1 - Math.abs((event.contentOffset.x / screenWidth) - index) * 0.5);
+      animationOpacity.value = withTiming(1 - Math.abs((event.contentOffset.x / screenWidth) - index) * 0.3);
     },
   });
 
@@ -127,7 +135,7 @@ const OnboardingScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   };
 
   const handleScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
     const clampedIndex = Math.max(0, Math.min(onboardingSlides.length - 1, nextIndex));
 
     if (clampedIndex !== currentIndex) {
@@ -154,14 +162,36 @@ const OnboardingScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const AnimationComponent = animationComponents[item.svgComponent as keyof typeof animationComponents];
     
     return (
-      <View style={[styles.slide, { width }]}>
+      <View style={[styles.slide, { width: screenWidth }]}>
         <Animated.View style={[styles.animationContainer, { opacity: animationOpacity }]}>
           {AnimationComponent && <AnimationComponent />}
         </Animated.View>
         
-        <Animated.View style={[styles.textContainer, { opacity: titleOpacity }]}>
-          <Text style={styles.title}>{t(item.titleKey)}</Text>
-          <Text style={styles.description}>{t(item.descriptionKey)}</Text>
+        <Animated.View
+          style={[
+            styles.textContainer,
+            isCompactHeight && styles.textContainerCompact,
+            { opacity: titleOpacity },
+          ]}
+        >
+          <Text
+            style={[
+              styles.title,
+              { fontSize: titleFontSize, lineHeight: titleLineHeight },
+            ]}
+            maxFontSizeMultiplier={1.15}
+          >
+            {t(item.titleKey)}
+          </Text>
+          <Text
+            style={[
+              styles.description,
+              { fontSize: descriptionFontSize, lineHeight: descriptionLineHeight },
+            ]}
+            maxFontSizeMultiplier={1.15}
+          >
+            {t(item.descriptionKey)}
+          </Text>
         </Animated.View>
       </View>
     );
@@ -174,6 +204,7 @@ const OnboardingScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         index={index}
         isActive={currentIndex === index}
         onPress={() => handleDotPress(index)}
+        pageWidth={screenWidth}
         scrollX={scrollX}
       />
     );
@@ -277,25 +308,29 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   textContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    flex: 1.15,
+    justifyContent: 'flex-start',
     alignItems: 'center',
+    width: '100%',
     paddingHorizontal: 30,
-    marginTop: 40,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  textContainerCompact: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
   },
   title: {
-    fontSize: 28,
     fontWeight: '700',
     color: '#1f2937',
     textAlign: 'center',
-    lineHeight: 36,
     marginBottom: 16,
+    flexShrink: 1,
   },
   description: {
-    fontSize: 16,
     color: '#6b7280',
     textAlign: 'center',
-    lineHeight: 24,
+    flexShrink: 1,
   },
   dotsContainer: {
     flexDirection: 'row',
